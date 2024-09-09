@@ -1,73 +1,50 @@
 import streamlit as st
-from st_clickable_images import clickable_images
-from PIL import Image
 import base64
-import io
+import streamlit.components.v1 as components
 
-# セッション状態の初期化
-if 'uploaded_images' not in st.session_state:
-    st.session_state['uploaded_images'] = []
-if 'current_index' not in st.session_state:
-    st.session_state['current_index'] = 0
+# 画像アップロード
+uploaded_files = st.file_uploader("画像を選択してください", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-# アップロード機能を提供
-uploaded_files = st.file_uploader("画像をアップロードしてください", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
-
-# アップロードされたファイルをリストに保存
+# アップロードされた画像が存在するかチェック
 if uploaded_files:
-    st.session_state['uploaded_images'] = []  # リストをリセット
+    # アップロードされた画像のリストをbase64エンコードしてJavaScriptで利用可能にする
+    image_list = []
     for uploaded_file in uploaded_files:
-        st.session_state['uploaded_images'].append(uploaded_file)
-    st.session_state['current_index'] = 0  # インデックスをリセット
+        bytes_data = uploaded_file.read()
+        base64_encoded_image = base64.b64encode(bytes_data).decode('utf-8')
+        image_list.append(f"data:image/jpeg;base64,{base64_encoded_image}")
 
-# 画像をbase64エンコードする関数
-def image_to_base64(image_file):
-    try:
-        img = Image.open(image_file)
-        img = img.convert('RGB')  # PNGなどの透過画像をRGBに変換
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG")
-        return base64.b64encode(buffered.getvalue()).decode()
-    except Exception as e:
-        st.error(f"画像の処理中にエラーが発生しました: {str(e)}")
-        return None
+    # HTMLとJavaScriptで画像のクリックイベントを処理する
+    html_code = f"""
+        <div id="image-container" style="text-align:center;">
+            <img id="main-image" src="{image_list[0]}" style="max-width:100%;" />
+            <br/>
+            <button onclick="prevImage()">前の画像</button>
+            <button onclick="nextImage()">次の画像</button>
+        </div>
 
-# Streamlitのインターフェース
-st.title("ランダム画像表示アプリ")
+        <script type="text/javascript">
+            var images = {image_list};
+            var currentIndex = 0;
 
-if st.session_state['uploaded_images']:
-    try:
-        # 現在の画像ファイルを取得
-        current_image_file = st.session_state['uploaded_images'][st.session_state['current_index']]
-        
-        # ファイルポインタをリセット
-        current_image_file.seek(0)
-        
-        # 画像をbase64エンコード
-        current_image_base64 = image_to_base64(current_image_file)
-        
-        if current_image_base64:
-            # クリック可能な画像を表示
-            clicked = clickable_images(
-                [f"data:image/jpeg;base64,{current_image_base64}"],
-                titles=[f"画像 {st.session_state['current_index'] + 1} / {len(st.session_state['uploaded_images'])}"],
-                div_style={"display": "flex", "justify-content": "center", "flex-wrap": "wrap"},
-                img_style={"margin": "5px", "height": "auto", "max-width": "100%"}
-            )
-            
-            # クリックされたら次の画像に進む
-            if clicked > -1:
-                st.session_state['current_index'] = (st.session_state['current_index'] + 1) % len(st.session_state['uploaded_images'])
-                st.experimental_rerun()
-        else:
-            st.error("画像の処理中にエラーが発生しました。")
-    
-    except Exception as e:
-        st.error(f"予期せぬエラーが発生しました: {str(e)}")
+            function updateImage() {{
+                var imgElement = document.getElementById("main-image");
+                imgElement.src = images[currentIndex];
+            }}
 
-    # デバッグ情報の表示
-    st.write(f"アップロードされた画像の数: {len(st.session_state['uploaded_images'])}")
-    st.write(f"現在のインデックス: {st.session_state['current_index']}")
+            function nextImage() {{
+                currentIndex = (currentIndex + 1) % images.length;
+                updateImage();
+            }}
 
+            function prevImage() {{
+                currentIndex = (currentIndex - 1 + images.length) % images.length;
+                updateImage();
+            }}
+        </script>
+    """
+
+    # HTMLを埋め込む
+    components.html(html_code, height=400)
 else:
     st.write("画像をアップロードしてください。")
