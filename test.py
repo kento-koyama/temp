@@ -1,13 +1,12 @@
 import streamlit as st
-import base64
-from io import BytesIO
+from st_clickable_images import clickable_images
 from PIL import Image
+import base64
+import io
 
-# アップロードされた画像のリスト
+# セッション状態の初期化
 if 'uploaded_images' not in st.session_state:
     st.session_state['uploaded_images'] = []
-
-# 現在の画像インデックス
 if 'current_index' not in st.session_state:
     st.session_state['current_index'] = 0
 
@@ -16,57 +15,38 @@ uploaded_files = st.file_uploader("画像をアップロードしてください
 
 # アップロードされたファイルをリストに保存
 if uploaded_files:
+    st.session_state['uploaded_images'] = []  # リストをリセット
     for uploaded_file in uploaded_files:
-        if uploaded_file not in st.session_state['uploaded_images']:
-            st.session_state['uploaded_images'].append(uploaded_file)
+        image_bytes = uploaded_file.read()
+        st.session_state['uploaded_images'].append(image_bytes)
+    st.session_state['current_index'] = 0  # インデックスをリセット
 
-# 画像をHTMLとして表示してクリック可能にする関数
-def get_clickable_image(image_file):
-    img = Image.open(image_file)
-    buffered = BytesIO()
+# 画像をbase64エンコードする関数
+def image_to_base64(image_bytes):
+    img = Image.open(io.BytesIO(image_bytes))
+    buffered = io.BytesIO()
     img.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return f'<img src="data:image/png;base64,{img_str}" style="max-width:100%;cursor:pointer;" onclick="nextImage()">'
-
-# JavaScriptを使用して画像をクリックしたときの動作を定義
-js = """
-<script>
-function nextImage() {
-    window.parent.postMessage({type: 'next_image'}, '*');
-}
-</script>
-"""
+    return base64.b64encode(buffered.getvalue()).decode()
 
 # Streamlitのインターフェース
 st.title("ランダム画像表示アプリ")
 
 if st.session_state['uploaded_images']:
-    # JavaScriptを挿入
-    st.markdown(js, unsafe_allow_html=True)
-
-    # 現在の画像を表示
-    current_image = st.session_state['uploaded_images'][st.session_state['current_index']]
-    st.markdown(get_clickable_image(current_image), unsafe_allow_html=True)
-
-    # JavaScriptからのメッセージを受け取る
-    if st.session_state.get('next_image', False):
+    # 現在の画像をbase64エンコード
+    current_image = image_to_base64(st.session_state['uploaded_images'][st.session_state['current_index']])
+    
+    # クリック可能な画像を表示
+    clicked = clickable_images(
+        [current_image],
+        titles=[f"画像 {st.session_state['current_index'] + 1} / {len(st.session_state['uploaded_images'])}"],
+        div_style={"display": "flex", "justify-content": "center", "flex-wrap": "wrap"},
+        img_style={"margin": "5px", "height": "auto", "max-width": "100%"}
+    )
+    
+    # クリックされたら次の画像に進む
+    if clicked > -1:
         st.session_state['current_index'] = (st.session_state['current_index'] + 1) % len(st.session_state['uploaded_images'])
-        st.session_state['next_image'] = False
         st.experimental_rerun()
 
-    # JavaScriptからのメッセージをキャッチするためのコンポーネント
-    st.markdown("""
-        <script>
-        window.addEventListener('message', function(e) {
-            if (e.data.type === 'next_image') {
-                window.parent.postMessage({
-                    type: 'streamlit:set_component_value',
-                    key: 'next_image',
-                    value: true
-                }, '*');
-            }
-        });
-        </script>
-    """, unsafe_allow_html=True)
 else:
     st.write("画像をアップロードしてください。")
