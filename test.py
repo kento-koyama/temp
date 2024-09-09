@@ -17,10 +17,7 @@ if uploaded_files:
     # HTMLとJavaScriptで画像のクリックイベントを処理する
     html_code = f"""
         <div id="image-container" style="text-align:center;">
-            <img id="main-image" src="{image_list[0]}" style="max-width:100%;" />
-            <br/>
-            <button onclick="prevImage()">前の画像</button>
-            <button onclick="nextImage()">次の画像</button>
+            <img id="main-image" src="{image_list[0]}" style="max-width:100%; cursor: pointer;" onclick="nextImage()"/>
         </div>
 
         <script type="text/javascript">
@@ -34,11 +31,6 @@ if uploaded_files:
 
             function nextImage() {{
                 currentIndex = (currentIndex + 1) % images.length;
-                updateImage();
-            }}
-
-            function prevImage() {{
-                currentIndex = (currentIndex - 1 + images.length) % images.length;
                 updateImage();
             }}
         </script>
